@@ -285,6 +285,7 @@ struct SocketOptions {
     int tcp_user_timeout_ms{ -1};
     // Tag of this socket
     bthread_tag_t bthread_tag{bthread_self_tag()};
+    bool rdma_polling{false};
 };
 
 // Abstractions on reading from and writing into file descriptors.
@@ -980,6 +981,7 @@ private:
     int _tcp_user_timeout_ms;
 
     HttpMethod _http_request_method;
+    bool _rdma_polling;
 };
 
 } // namespace brpc

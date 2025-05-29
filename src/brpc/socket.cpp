@@ -102,6 +102,8 @@ DEFINE_int32(connect_timeout_as_unreachable, 3,
 DECLARE_int32(health_check_timeout_ms);
 DECLARE_bool(usercode_in_coroutine);
 
+DECLARE_bool(rdma_polling);
+
 static bool validate_connect_timeout_as_unreachable(const char*, int32_t v) {
     return v >= 2 && v < 1000/*large enough*/;
 }
@@ -604,11 +606,19 @@ int Socket::ResetFileDescriptor(int fd) {
     SetSocketOptions(fd);
 
     if (_on_edge_triggered_events) {
-        if (_io_event.AddConsumer(fd) != 0) {
-            PLOG(ERROR) << "Fail to add SocketId=" << id() 
-                        << " into EventDispatcher";
-            _fd.store(-1, butil::memory_order_release);
-            return -1;
+        if (_rdma_polling) {
+            SocketUniquePtr s;
+            ReAddress(&s);
+            // transfer ownership as well, don't use s anymore !
+            Socket* const p = s.release();
+            _on_edge_triggered_events(p);
+        } else {
+            if (_io_event.AddConsumer(fd) != 0) {
+                PLOG(ERROR) << "Fail to add SocketId=" << id() 
+                            << " into EventDispatcher";
+                _fd.store(-1, butil::memory_order_release);
+                return -1;
+            }
         }
     }
     return 0;
@@ -759,6 +769,7 @@ int Socket::OnCreated(const SocketOptions& options) {
     _ssl_session = NULL;
     _ssl_ctx = options.initial_ssl_ctx;
 #if BRPC_WITH_RDMA
+    _rdma_polling = options.rdma_polling;
     CHECK(_rdma_ep == NULL);
     if (options.use_rdma) {
         _rdma_ep = new (std::nothrow)rdma::RdmaEndpoint(this);

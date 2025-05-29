@@ -185,6 +185,11 @@ private:
     // Poll CQ and get the work completion
     static void PollCq(Socket* m);
 
+    // Rdma Polling
+    static void* RdmaPolling(void* arg);
+
+    static void* StartPolling(Socket* m);
+
     // Get the description of current handshake state
     std::string GetStateStr() const;
 
